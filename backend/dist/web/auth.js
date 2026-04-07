@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { z } from "zod";
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 const emailPasswordSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().min(8).max(128),

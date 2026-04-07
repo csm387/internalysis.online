@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 
 declare module "fastify" {
   interface FastifyRequest {

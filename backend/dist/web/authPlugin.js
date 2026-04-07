@@ -1,5 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 const SESSION_COOKIE = "mistery_session";
 const CSRF_COOKIE = "mistery_csrf";
 function sha256Hex(input) {

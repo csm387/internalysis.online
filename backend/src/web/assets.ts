@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 
 const uploadSchema = z.object({
   dataUrl: z.string().min(16),

@@ -5,13 +5,13 @@ import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import helmet from "@fastify/helmet";
 
-import { registerHealthRoutes } from "./web/health";
-import { registerSwagger } from "./web/swagger";
-import { registerAuthRoutes } from "./web/auth";
-import { authPlugin } from "./web/authPlugin";
-import { registerScenarioRoutes } from "./web/scenarios";
-import { registerProgressRoutes } from "./web/progress";
-import { registerAssetRoutes } from "./web/assets";
+import { registerHealthRoutes } from "./web/health.js";
+import { registerSwagger } from "./web/swagger.js";
+import { registerAuthRoutes } from "./web/auth.js";
+import { authPlugin } from "./web/authPlugin.js";
+import { registerScenarioRoutes } from "./web/scenarios.js";
+import { registerProgressRoutes } from "./web/progress.js";
+import { registerAssetRoutes } from "./web/assets.js";
 
 function requireEnv(name: string) {
   const v = process.env[name];
