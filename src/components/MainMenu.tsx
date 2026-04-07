@@ -6,41 +6,47 @@ import { TUTORIAL_SCENARIO } from "@/data/tutorialScenario";
 import { useGameStore } from "@/engine/state";
 import { useRouter } from "next/navigation";
 import type { Scenario } from "@/engine/scenarioTypes";
-import {
-  loadLibrary,
-  saveLibrary,
-  listLibraryScenarios,
-  deleteScenario,
-  renameScenario,
-  togglePin,
-} from "@/engine/scenarioLibrary";
+import { useAuthStore } from "@/engine/authStore";
+import type { ScenarioMeta } from "@/repositories/backendApi";
+import { apiDeleteScenario, apiGetScenario, apiListScenarios, apiUpdateScenario } from "@/repositories/backendApi";
 
 export function MainMenu() {
   const startGame = useGameStore((s) => s.startGame);
   const setScenario = useGameStore((s) => s.setScenario);
   const router = useRouter();
-  const [libVersion, setLibVersion] = useState(0);
+  const { user, csrfToken, loading, refresh, logout } = useAuthStore();
+  const [onlineItems, setOnlineItems] = useState<ScenarioMeta[]>([]);
   const [importText, setImportText] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    // trigger initial library load
-    setLibVersion((v) => v + 1);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setOnlineItems([]);
+      return;
+    }
+    apiListScenarios()
+      .then((r) => setOnlineItems(r.scenarios))
+      .catch((e) => setStatus(e instanceof Error ? e.message : "Failed to load scenarios"));
+  }, [user]);
+
+  async function startOnlineScenario(id: string) {
+    const full = await apiGetScenario(id);
+    const s = full.scenario;
+    setScenario(s, { reset: true });
+    startGame(s);
+  }
 
   const scenarios = useMemo(() => {
     const builtins = [TUTORIAL_SCENARIO, DEFAULT_SCENARIO];
     const byId = new Map<string, Scenario>();
     for (const s of builtins) byId.set(s.id, s);
-    const lib = loadLibrary();
-    for (const item of listLibraryScenarios(lib)) byId.set(item.scenario.id, item.scenario);
     return Array.from(byId.values());
-  }, [libVersion]);
-
-  const libraryItems = useMemo(() => {
-    const lib = loadLibrary();
-    return listLibraryScenarios(lib);
-  }, [libVersion]);
+  }, []);
 
   return (
     <div className="pixel-ui crt jitter relative flex-1 overflow-hidden">
@@ -52,10 +58,42 @@ export function MainMenu() {
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <div className="text-[12px] text-zinc-200/70">OFFLINE CASE PLATFORM</div>
-              <div className="text-[26px] leading-8 text-zinc-100/90">MISTERY OS</div>
+              <div className="text-[26px] leading-8 text-zinc-100/90">internalysis.online</div>
             </div>
             <div className="text-right text-[11px] text-zinc-200/60">
-              Select a scenario, or create your own in the Editor.
+              {user ? (
+                <div className="space-y-1">
+                  <div>Signed in{user.email ? `: ${user.email}` : ""}</div>
+                  <button
+                    type="button"
+                    className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
+                    onClick={() => logout()}
+                    disabled={loading}
+                  >
+                    LOGOUT
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div>Sign in to use the online library.</div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
+                      onClick={() => router.push("/login")}
+                    >
+                      LOGIN
+                    </button>
+                    <button
+                      type="button"
+                      className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
+                      onClick={() => router.push("/register")}
+                    >
+                      REGISTER
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -151,31 +189,33 @@ export function MainMenu() {
           </div>
 
           <div className="mt-4 rounded-sm border border-white/10 bg-black/10 p-3">
-            <div className="mb-2 text-[11px] text-zinc-200/70">SCENARIO LIBRARY (SAVED)</div>
-            {libraryItems.length === 0 ? (
+            <div className="mb-2 text-[11px] text-zinc-200/70">SCENARIO LIBRARY (ONLINE)</div>
+            {!user ? (
+              <div className="text-[12px] text-zinc-200/60">Login to see your online scenarios.</div>
+            ) : onlineItems.length === 0 ? (
               <div className="text-[12px] text-zinc-200/60">
                 No saved scenarios yet. Create one in the Editor and save it.
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {libraryItems.map((it) => (
+                {onlineItems.map((it) => (
                   <div
-                    key={it.scenario.id}
+                    key={it.id}
                     className="rounded-[2px] border border-white/10 bg-black/10 p-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate text-[12px] text-zinc-100/90">
                           {it.pinned ? "★ " : ""}
-                          {it.displayName}
+                          {it.name}
                         </div>
-                        <div className="truncate text-[11px] text-zinc-200/60">{it.scenario.id}</div>
+                        <div className="truncate text-[11px] text-zinc-200/60">{it.id}</div>
                       </div>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           className="h-8 rounded-[2px] border border-white/10 bg-[color:var(--ui-2)] px-3 text-[12px] hover:border-white/20"
-                          onClick={() => startGame(it.scenario)}
+                          onClick={() => startOnlineScenario(it.id)}
                         >
                           START
                         </button>
@@ -186,11 +226,10 @@ export function MainMenu() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
-                        onClick={() => {
-                          const lib = loadLibrary();
-                          const next = togglePin(lib, it.scenario.id);
-                          saveLibrary(next);
-                          setLibVersion((v) => v + 1);
+                        onClick={async () => {
+                          await apiUpdateScenario(it.id, { pinned: !it.pinned }, csrfToken);
+                          const r = await apiListScenarios();
+                          setOnlineItems(r.scenarios);
                         }}
                       >
                         {it.pinned ? "UNPIN" : "PIN"}
@@ -198,13 +237,12 @@ export function MainMenu() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
-                        onClick={() => {
-                          const name = prompt("Rename scenario", it.displayName);
+                        onClick={async () => {
+                          const name = prompt("Rename scenario", it.name);
                           if (!name) return;
-                          const lib = loadLibrary();
-                          const next = renameScenario(lib, it.scenario.id, name);
-                          saveLibrary(next);
-                          setLibVersion((v) => v + 1);
+                          await apiUpdateScenario(it.id, { name }, csrfToken);
+                          const r = await apiListScenarios();
+                          setOnlineItems(r.scenarios);
                         }}
                       >
                         RENAME
@@ -212,12 +250,11 @@ export function MainMenu() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-[color:var(--danger)]/40 bg-black/10 px-2 text-[11px] text-zinc-100/90 hover:border-[color:var(--danger)]/70"
-                        onClick={() => {
-                          if (!confirm(`Delete "${it.displayName}"?`)) return;
-                          const lib = loadLibrary();
-                          const next = deleteScenario(lib, it.scenario.id);
-                          saveLibrary(next);
-                          setLibVersion((v) => v + 1);
+                        onClick={async () => {
+                          if (!confirm(`Delete "${it.name}"?`)) return;
+                          await apiDeleteScenario(it.id, csrfToken);
+                          const r = await apiListScenarios();
+                          setOnlineItems(r.scenarios);
                         }}
                       >
                         DELETE
@@ -225,8 +262,9 @@ export function MainMenu() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
-                        onClick={() => {
-                          setScenario(it.scenario, { reset: true });
+                        onClick={async () => {
+                          const full = await apiGetScenario(it.id);
+                          setScenario(full.scenario, { reset: true });
                           router.push("/editor");
                         }}
                       >

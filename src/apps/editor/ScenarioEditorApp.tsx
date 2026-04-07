@@ -6,15 +6,16 @@ import { useGameStore } from "@/engine/state";
 import type { Scenario, WebsitePage } from "@/engine/scenarioTypes";
 import type { Clue, UnlockCondition } from "@/engine/types";
 import { validateScenario } from "@/engine/scenarioValidate";
+import { useAuthStore } from "@/engine/authStore";
 import {
-  loadLibrary,
-  saveLibrary,
-  listLibraryScenarios,
-  upsertScenario,
-  deleteScenario,
-  renameScenario,
-  togglePin,
-} from "@/engine/scenarioLibrary";
+  apiDeleteScenario,
+  apiGetScenario,
+  apiListScenarios,
+  apiUpdateScenario,
+  apiUploadAsset,
+  apiUpsertScenario,
+  type ScenarioMeta,
+} from "@/repositories/backendApi";
 
 function safeJsonParse<T>(text: string): { ok: true; value: T } | { ok: false; error: string } {
   try {
@@ -95,13 +96,14 @@ export function ScenarioEditorApp() {
   const resetCaseState = useGameStore((s) => s.resetCaseState);
   const startGame = useGameStore((s) => s.startGame);
   const router = useRouter();
+  const { user, csrfToken } = useAuthStore();
 
   const [tab, setTab] = useState<"meta" | "clues" | "sites" | "io" | "library" | "validate">("meta");
   const [selectedClueId, setSelectedClueId] = useState<string>(scenario.clues[0]?.id ?? "");
   const [selectedPageId, setSelectedPageId] = useState<string>(scenario.websites[0]?.id ?? "");
   const [ioText, setIoText] = useState<string>(() => JSON.stringify(scenario, null, 2));
   const [ioStatus, setIoStatus] = useState<string>("");
-  const [libTick, setLibTick] = useState(0);
+  const [onlineItems, setOnlineItems] = useState<ScenarioMeta[]>([]);
   const [renameDraft, setRenameDraft] = useState<string>("");
 
   const selectedClue = useMemo(
@@ -117,26 +119,34 @@ export function ScenarioEditorApp() {
     setScenario({ ...scenario, ...patch }, { reset: false });
   }
 
-  function saveToLibrary() {
-    const lib = loadLibrary();
-    const next = upsertScenario(lib, scenario);
-    saveLibrary(next);
-    setLibTick((v) => v + 1);
-    setIoStatus(`Saved "${scenario.name}" to Library.`);
-  }
-
-  function loadFromLibrary(id: string) {
-    const lib = loadLibrary();
-    const s = lib.scenarios[id];
-    if (!s) {
-      setIoStatus("Load failed: missing scenario.");
+  async function refreshOnlineList() {
+    if (!user) {
+      setOnlineItems([]);
       return;
     }
+    const r = await apiListScenarios();
+    setOnlineItems(r.scenarios);
+  }
+
+  async function saveToLibrary() {
+    if (!user) {
+      setIoStatus("Login required to save online.");
+      return;
+    }
+    await apiUpsertScenario({ id: scenario.id, name: scenario.name, json: scenario }, csrfToken);
+    await refreshOnlineList();
+    setIoStatus(`Saved "${scenario.name}" online.`);
+  }
+
+  async function loadFromLibrary(id: string) {
+    if (!user) return;
+    const full = await apiGetScenario(id);
+    const s = full.scenario as Scenario;
     setScenario(s, { reset: true });
     setSelectedClueId(s.clues[0]?.id ?? "");
     setSelectedPageId(s.websites[0]?.id ?? "");
     setIoText(JSON.stringify(s, null, 2));
-    setIoStatus(`Loaded "${s.name}" from Library.`);
+    setIoStatus(`Loaded "${s.name}" online.`);
   }
 
   const validation = useMemo(() => validateScenario(scenario), [scenario]);
@@ -150,6 +160,22 @@ export function ScenarioEditorApp() {
       r.readAsDataURL(file);
     });
     if (!selectedClue) return;
+
+    if (user) {
+      try {
+        const up = await apiUploadAsset(dataUrl, csrfToken);
+        patchScenario({
+          clues: scenario.clues.map((c) =>
+            c.id === selectedClue.id ? { ...c, content: { ...c.content, imageSrc: up.url } } : c,
+          ),
+        });
+        setIoStatus("Image uploaded to backend assets.");
+        return;
+      } catch (e) {
+        setIoStatus(`Upload failed, keeping local data URL. (${e instanceof Error ? e.message : "error"})`);
+      }
+    }
+
     patchScenario({
       clues: scenario.clues.map((c) =>
         c.id === selectedClue.id ? { ...c, content: { ...c.content, imageSrc: dataUrl } } : c,
@@ -194,14 +220,17 @@ export function ScenarioEditorApp() {
             className="h-8 w-full rounded-[2px] border border-white/10 bg-[color:var(--ui-2)] px-2 text-[12px] hover:border-white/20"
             onClick={saveToLibrary}
           >
-            SAVE (LIBRARY)
+            SAVE (ONLINE)
           </button>
           <button
             type="button"
             className="h-8 w-full rounded-[2px] border border-white/10 bg-black/10 px-2 text-[12px] hover:border-white/20"
-            onClick={() => setTab("library")}
+            onClick={async () => {
+              await refreshOnlineList();
+              setTab("library");
+            }}
           >
-            OPEN LIBRARY
+            OPEN ONLINE LIBRARY
           </button>
           <button
             type="button"
@@ -695,24 +724,29 @@ export function ScenarioEditorApp() {
             <div className="rounded-sm border border-white/10 bg-black/10 p-3">
               <div className="mb-2 text-[11px] text-zinc-200/70">LIBRARY</div>
               <div className="mb-2 text-[12px] text-zinc-100/80">
-                Saved scenarios are stored locally for now (online-ready later).
+                Saved scenarios are stored online (per account).
               </div>
 
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {listLibraryScenarios(loadLibrary()).map((it) => (
-                  <div key={it.scenario.id} className="rounded-[2px] border border-white/10 bg-black/10 p-2">
+                {!user ? (
+                  <div className="text-[12px] text-zinc-200/70">Login required.</div>
+                ) : onlineItems.length === 0 ? (
+                  <div className="text-[12px] text-zinc-200/70">No scenarios yet.</div>
+                ) : (
+                  onlineItems.map((it) => (
+                  <div key={it.id} className="rounded-[2px] border border-white/10 bg-black/10 p-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate text-[12px] text-zinc-100/90">
                           {it.pinned ? "★ " : ""}
-                          {it.displayName}
+                          {it.name}
                         </div>
-                        <div className="truncate text-[11px] text-zinc-200/60">{it.scenario.id}</div>
+                        <div className="truncate text-[11px] text-zinc-200/60">{it.id}</div>
                       </div>
                       <button
                         type="button"
                         className="h-8 rounded-[2px] border border-white/10 bg-[color:var(--ui-2)] px-3 text-[12px] hover:border-white/20"
-                        onClick={() => loadFromLibrary(it.scenario.id)}
+                        onClick={() => loadFromLibrary(it.id)}
                       >
                         LOAD
                       </button>
@@ -722,10 +756,9 @@ export function ScenarioEditorApp() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
-                        onClick={() => {
-                          const lib = loadLibrary();
-                          saveLibrary(togglePin(lib, it.scenario.id));
-                          setLibTick((v) => v + 1);
+                        onClick={async () => {
+                          await apiUpdateScenario(it.id, { pinned: !it.pinned }, csrfToken);
+                          await refreshOnlineList();
                         }}
                       >
                         {it.pinned ? "UNPIN" : "PIN"}
@@ -733,12 +766,11 @@ export function ScenarioEditorApp() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-white/10 bg-black/10 px-2 text-[11px] hover:border-white/20"
-                        onClick={() => {
-                          const name = prompt("Rename scenario", it.displayName);
+                        onClick={async () => {
+                          const name = prompt("Rename scenario", it.name);
                           if (!name) return;
-                          const lib = loadLibrary();
-                          saveLibrary(renameScenario(lib, it.scenario.id, name));
-                          setLibTick((v) => v + 1);
+                          await apiUpdateScenario(it.id, { name }, csrfToken);
+                          await refreshOnlineList();
                         }}
                       >
                         RENAME
@@ -746,18 +778,17 @@ export function ScenarioEditorApp() {
                       <button
                         type="button"
                         className="h-7 rounded-[2px] border border-[color:var(--danger)]/40 bg-black/10 px-2 text-[11px] text-zinc-100/90 hover:border-[color:var(--danger)]/70"
-                        onClick={() => {
-                          if (!confirm(`Delete "${it.displayName}"?`)) return;
-                          const lib = loadLibrary();
-                          saveLibrary(deleteScenario(lib, it.scenario.id));
-                          setLibTick((v) => v + 1);
+                        onClick={async () => {
+                          if (!confirm(`Delete "${it.name}"?`)) return;
+                          await apiDeleteScenario(it.id, csrfToken);
+                          await refreshOnlineList();
                         }}
                       >
                         DELETE
                       </button>
                     </div>
                   </div>
-                ))}
+                )))}
               </div>
             </div>
 
@@ -773,13 +804,13 @@ export function ScenarioEditorApp() {
                 <button
                   type="button"
                   className="h-8 rounded-[2px] border border-white/10 bg-[color:var(--ui-2)] px-3 text-[12px] hover:border-white/20"
-                  onClick={() => {
+                  onClick={async () => {
                     const name = renameDraft.trim();
                     if (!name) return;
-                    const lib = loadLibrary();
-                    saveLibrary(renameScenario(lib, scenario.id, name));
-                    setLibTick((v) => v + 1);
-                    setIoStatus("Renamed in library (override).");
+                    if (!user) return;
+                    await apiUpdateScenario(scenario.id, { name }, csrfToken);
+                    await refreshOnlineList();
+                    setIoStatus("Renamed online.");
                   }}
                 >
                   APPLY

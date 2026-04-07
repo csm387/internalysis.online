@@ -1,4 +1,4 @@
-## Mistery OS — Browser-based detective investigation game
+## internalysis.online — Browser-based detective investigation game
 
 A fictional, **offline** detective investigation prototype built with **Next.js (App Router) + React + TypeScript**.
 

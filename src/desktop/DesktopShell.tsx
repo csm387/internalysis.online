@@ -37,10 +37,10 @@ export function DesktopShell() {
           </button>
         </div>
         <div className="grid w-[220px] grid-cols-2 gap-3">
-          <DesktopIcon label="Browser" onOpen={() => openApp("browser", { mode: "reuse" })} />
-          <DesktopIcon label="Files" onOpen={() => openApp("files")} />
-          <DesktopIcon label="Messages" onOpen={() => openApp("messages")} />
-          <DesktopIcon label="Case Board" onOpen={() => openApp("board")} />
+          <DesktopIcon label="Browser" iconSrc="/apps_icons/browser_icon.svg" onOpen={() => openApp("browser", { mode: "reuse" })} />
+          <DesktopIcon label="Files" iconSrc="/apps_icons/files_icon.svg" onOpen={() => openApp("files")} />
+          <DesktopIcon label="Messages" iconSrc="/apps_icons/messages_icon.svg" onOpen={() => openApp("messages")} />
+          <DesktopIcon label="Case Board" iconSrc="/apps_icons/case_board_icon.svg" onOpen={() => openApp("board")} />
         </div>
       </div>
 

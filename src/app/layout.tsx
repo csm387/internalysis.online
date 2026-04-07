@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mistery OS",
-  description: "A fictional detective investigation game.",
+  title: "internalysis.online",
+  description: "internalysis.online — a fictional detective investigation game.",
 };
 
 export default function RootLayout({
