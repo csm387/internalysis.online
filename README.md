@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Mistery OS — Browser-based detective investigation game
+
+A fictional, **offline** detective investigation prototype built with **Next.js (App Router) + React + TypeScript**.
+
+You play inside a fake “old computer” desktop:
+
+- **Desktop environment**: taskbar, icons, window system (open/close/focus)
+- **Apps**: Browser, Files, Messages, Case Board
+- **In-game browser**: fake URL space (`os://browser/...`), clickable links, keyword search
+- **Evidence system**: data-driven clues in `src/data/clues.ts`
+- **Progression engine**: unlocks clues based on conditions + case-board validation
+
+Everything is **locally generated / hard-coded fictional data**. No real APIs. No internet.
 
 ## Getting Started
 
-First, run the development server:
+Install and run the dev server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Core folders (MVP)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The project uses a modular “fake OS” architecture:
 
-## Learn More
+- `src/app/`: Next.js route shell
+- `src/components/`: app-level React components (e.g. `GameRoot`)
+- `src/desktop/`: desktop UI (icons/taskbar)
+- `src/windows/`: window manager + window chrome
+- `src/apps/`: in-OS apps
+  - `src/apps/browser/`: fake browser UI + rendering
+  - `src/apps/files/`: file explorer UI + file viewer
+  - `src/apps/messages/`: fake email/messages UI
+  - `src/apps/board/`: case board UI + linking + notes
+- `src/data/`: fictional content
+  - `src/data/clues.ts`: evidence definitions + unlock conditions
+  - `src/data/websites.ts`: offline website pages + links + keywords
+  - `src/data/files.ts`: fake filesystem tree
+  - `src/data/messages.ts`: fake message threads
+- `src/engine/`: gameplay logic + global state
+  - `src/engine/state.ts`: Zustand store (windows, discovered clues, progress)
+  - `src/engine/gameEngine.ts`: pure unlock/progression logic
+  - `src/engine/types.ts`: shared types
 
-To learn more about Next.js, take a look at the following resources:
+## How progression works (MVP)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Start with two clues pre-discovered (`STARTING_CLUE_IDS`)
+- Visiting certain browser pages can discover website clues
+- Opening certain files discovers file-based clues
+- Linking key evidence on the case board triggers a **stage breakthrough** and unlocks additional pages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Notes
 
-## Deploy on Vercel
+- Evidence images are simple local assets in `public/evidence/`
+- Visual style aims for a dark, pixel/PS2-era UI with optional CRT overlay (CSS)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
